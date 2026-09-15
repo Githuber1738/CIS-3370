@@ -1,0 +1,17 @@
+# Shared project configuration
+data:
+  nsl_kdd:
+    dir: data/nsl_kdd
+    train: KDDTrain+.txt
+    test: KDDTest+.txt
+    train_20pct: KDDTrain+_20Percent.txt
+    test_21: KDDTest-21.txt
+  kitsune:
+    dir: data/kitsune
+    # fill in once a specific attack scenario is chosen (see scripts/download_kitsune.sh)
+    scenario: null
+  cic_dos2017:
+    dir: data/cic_dos2017
+    file: cicdos2017.parquet
+
+random_seed: 42
