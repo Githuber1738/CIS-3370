@@ -48,3 +48,8 @@ Immediate tasks:
 | 2026-09-15 | Scope decision: NSL-KDD only for now; Kitsune/CIC-DoS2017 deferred as stretch goals |
 | 2026-09-15 | Scope revised per professor: switching primary target to CIC-DoS2017 (NSL-KDD is already covered in class) |
 | 2026-09-15 | CIC-DoS2017 downloaded via Kaggle mirror (dhoogla/cicdos2017) and ingestion loader written/verified |
+| 2026-10-08 | Delegated Commits confirmed as the team's commit approach (one teammate new to git) |
+| 2026-10-08 | Kitsune OS Scan scenario downloaded (confirmed via xNIDS repo's Scripts/kitsune.py that this is the scenario the paper's Table 12 Kitsune row actually trains on) -- 1,697,851 rows, 115 features + binary label, via Kaggle mirror ymirsky/network-attack-dataset-kitsune |
+| 2026-10-08 | src/ingestion/kitsune.py written + verified; fixed a row-alignment bug present in xNIDS's own reference script |
+| 2026-10-08 | src/models/kitsune_autoencoder.py: trained + evaluated the xNIDS-architecture autoencoder on Kitsune OS Scan. Recall 1.0 (vs paper's 0.9972) but precision 0.47 / FPR 0.118 vs paper's 0.9568 / 0.001 -- see conversation/Wiki report for the methodological explanation (threshold + scaler fit corrected to avoid train/test leakage present in the reference script) |
+| 2026-10-08 | Confirmed from the xNIDS paper text (Table 12 + Sec. 5 "Target DL-NIDS"): CIC-DoS2017 pairs with ODDS (LSTM-based bot detector), NOT Kitsune/autoencoder. Kitsune pairs only with its own dataset. This was previously an open question. |
