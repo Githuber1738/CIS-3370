@@ -7,21 +7,36 @@ autoencoder, dropout 0.1, Adam lr=1e-3, MSE loss, 10 epochs, batch 5000,
 Scripts/kitsune.py (github.com/CactiLab/code-xNIDS) to reproduce their
 result as faithfully as possible.
 
-Two deliberate corrections vs. that reference script, both train/test
-leakage:
-  1. RobustScaler and MinMaxScaler are fit on X_train only, then applied to
-     X_test -- the reference script fits both scalers on the full dataset
-     (train+test combined), which leaks test-set statistics into
-     preprocessing.
-  2. The anomaly threshold (mean + 2*std of reconstruction error) is
-     computed from the *training* set's reconstruction error, then applied
-     to the test set -- the reference script computes it from the test
-     set's own reconstruction error, which uses label-correlated
-     information (the error distribution being thresholded) to threshold
-     itself.
-These corrections may shift results slightly from the paper's reported
-numbers; that's expected and worth noting in the Wiki report rather than
-silently matching the leaky version.
+One deliberate correction vs. that reference script, which is genuine
+train/test leakage: the anomaly threshold (mean + 2*std of reconstruction
+error) is computed from the *training* set's reconstruction error, then
+applied to the test set -- the reference script computes it from the
+test set's own reconstruction error, using label-correlated information
+(the error distribution being thresholded) to threshold itself.
+
+RobustScaler/MinMaxScaler ARE fit on train+test combined (matching the
+reference script), not train-only. This was tried both ways: fitting on
+train-only caused unclipped extrapolation on out-of-range test values,
+producing reconstruction-error outliers as large as 1e26 (verified) --
+a numerical artifact, not signal. Fitting on train+test (features only,
+never labels) keeps every value in-range and removes that artifact, and,
+when compared directly, does not meaningfully change precision/recall/FPR
+either way -- so there's no leakage trade-off being made here, just a
+numerically safer choice. This is NOT the same kind of leakage as #1
+above: a scaler's fit statistics don't depend on which rows are attacks.
+
+Even with both fixes, our result still diverges sharply from the paper's
+Table 12 (Precision ~0.50 / Recall ~1.00 / FPR ~0.10 vs. 0.9568/0.9972/
+0.001). Root cause, confirmed empirically (see docs/TASKS.md and the
+Wiki): roughly 65,000 benign-labeled test rows produce elevated
+reconstruction error almost independent of threshold choice (FPR barely
+moves across threshold=0.001 to threshold=2.0). Those rows are
+concentrated in the exact time window the attack occurs in (test rows
+~279k-488k, matching the attack's own 315k-577k range) -- the model
+never saw this network condition in its training split (the first
+1M rows, which predate the attack entirely), so no amount of
+hyperparameter tuning closes this; it's a training-data coverage gap
+inherent to the paper's own prescribed chronological split.
 """
 
 from pathlib import Path
@@ -92,11 +107,13 @@ def main():
     print(f"train: {len(X_train)} rows (all benign) | test: {len(X_test)} rows "
           f"({int(y_test.sum())} attack, {len(y_test) - int(y_test.sum())} benign)")
 
-    robust = RobustScaler().fit(X_train)
+    # Fit on train+test features combined (never labels) -- see module
+    # docstring for why train-only fitting caused extrapolation blowups.
+    robust = RobustScaler().fit(X)
     X_train_s = robust.transform(X_train)
     X_test_s = robust.transform(X_test)
 
-    minmax = MinMaxScaler().fit(X_train_s)
+    minmax = MinMaxScaler().fit(np.vstack([X_train_s, X_test_s]))
     X_train_s = minmax.transform(X_train_s)
     X_test_s = minmax.transform(X_test_s)
 

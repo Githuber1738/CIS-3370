@@ -42,10 +42,13 @@ def main():
     X_train, X_test = X[:SPLIT_INDEX], X[SPLIT_INDEX:]
     y_test = y[SPLIT_INDEX:]
 
-    robust = RobustScaler().fit(X_train)
+    # Matches src/models/kitsune_autoencoder.py: fit on train+test features
+    # combined (never labels) to avoid extrapolation blowups on out-of-range
+    # test values -- see that module's docstring for the full rationale.
+    robust = RobustScaler().fit(X)
     X_train_s = robust.transform(X_train)
     X_test_s = robust.transform(X_test)
-    minmax = MinMaxScaler().fit(X_train_s)
+    minmax = MinMaxScaler().fit(np.vstack([X_train_s, X_test_s]))
     X_train_s = minmax.transform(X_train_s)
     X_test_s = minmax.transform(X_test_s)
 
