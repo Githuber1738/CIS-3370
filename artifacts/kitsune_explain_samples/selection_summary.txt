@@ -1,0 +1,3 @@
+threshold: 0.0012415711707559254
+tp: {'test_index': 449660, 'reconstruction_error': 8.022751502076986, 'rows': 11}
+fp: {'test_index': 381124, 'reconstruction_error': 7.638473647533009, 'rows': 11}

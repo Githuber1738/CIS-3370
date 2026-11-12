@@ -9,3 +9,6 @@ pyyaml>=6.0
 requests>=2.31
 jupyter>=1.0
 kaggle>=1.6
+# pinned: asgl 2.x rewrote the public API (no CV/ASGL/train_test_split);
+# 1.0.6 is the last version matching xNIDS's own explanation.py calls
+asgl==1.0.6
