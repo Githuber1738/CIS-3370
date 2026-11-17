@@ -166,6 +166,36 @@ Learned channel coefficients: MAC-IP −7.07, IP −3.54, Jitter +3.52, IPtoIP +
 
 **Verdict: no improvement — rules out "lack of supervision."** Even with direct label access while fitting the decision boundary (an advantage the paper's method never has), the result is within noise of every other attempt. This is the strongest evidence yet that the ceiling isn't about model capability at all — it's that the 5-channel representation itself doesn't separate attack-window benign traffic from the attack, for anything that gets to see it, supervised or not.
 
+### Attempt 6 — The real KitNET algorithm (original author's implementation, not a substitute)
+
+**Hypothesis:** Appendix C.1 of the xNIDS paper states Kitsune's one reported hyperparameter is `m=10` (max autoencoder size) — a detail that only makes sense for the *real* KitNET (online, incremental, correlation-clustered ensemble), not xNIDS's own `Scripts/kitsune.py` substitute (a single 115-wide batch-trained Keras autoencoder) or our own Attempt 4 ensemble (which used 5 assumed channels of 15-35 features each, already violating `m≤10`). This raised the possibility that Table 12's actual Kitsune numbers were never produced by the code we'd been testing against at all.
+
+**Change:** vendored the original author's own implementation (`github.com/ymirsky/KitNET-py`, MIT licensed) into `src/third_party/kitnet/`, fixed one NumPy 2.0 compatibility break (`np.Inf` → `np.inf`), and ran it faithfully: raw unscaled features (KitNET does its own online min-max normalization internally), `m=10`, `FM_grace_period=5000`, `AD_grace_period=50000` (the original repo's own documented defaults — confirmed by also checking the full `Kitsune-py` system repo's example scripts, which use the identical values with no scenario-specific tuning anywhere). All 1,697,851 rows streamed through in order; correlation clustering discovered **14 autoencoders** from the 115 features (not our assumed 5 channels). Threshold: same leak-free mean+2σ convention, calibrated on rows 55,000–1,000,000 (benign, past the grace period).
+
+**Result:**
+
+| Metric | Value |
+|---|---|
+| Precision | 0.4375 |
+| Recall | 0.9947 |
+| FPR | 0.1329 |
+
+**Verdict: no improvement — slightly worse than every substitute we built ourselves.** Ran in 209 seconds. This is the single most important negative result in this investigation: it is not our implementation, our architecture, or our training regime that's the limiting factor — the literal, original, paper-cited algorithm, run the standard documented way on the public dataset, lands in the same place. See `src/models/kitsune_real_kitnet.py`.
+
+---
+
+## Final Audit: Did the Original Authors Do Something We Missed?
+
+Before closing the replication phase, we went back over everything one more time — the complete paper text (all 18 pages, not just targeted keyword hits), every file in the `code-xNIDS` repository, all 14 of its GitHub issues, the full `Kitsune-py` system repo (not just the `KitNET-py` detector), and the raw Jupyter notebooks (checked for markdown commentary stripped out of the auto-exported `.py` scripts — there was none; the exports are complete).
+
+**The decisive finding came from the GitHub issues**, where the paper's first author (Feng Wei, `akafengfeng`) responds directly to other researchers asking the same kind of questions we had:
+
+- On a user pointing out that `Scripts/explanation.py`'s `search_proper_input` doesn't implement the paper's Section 3.2 algorithm correctly (missing the `l = ⌊l/2⌋` step-halving described in the paper): *"this parameter is not used in the demo code... I intentionally put it out of the loop in the demo code... this function is not implemented in the demo code, since the testcases are relatively simple."* The author confirms, in his own words, that the public code is explicitly simplified **demo code**, not an exact implementation of the paper's described method.
+- On a request for the defense-rule-generation implementation: *"The original rule generation module was managed using dozens of bash scripts and other tools. Unfortunately, since I've already graduated, I no longer have them readily available."* Core parts of the original experimental pipeline are confirmed **lost**, not merely unpublished.
+- A separate user asked literally our own question — how to obtain the OS Scan dataset — and received the same Kaggle mirror link we already used. No alternate or curated version exists that we missed.
+
+**Conclusion:** this satisfies the Phase 1 fallback trigger exactly as originally specified — *"missing dependencies, corrupted/unavailable code, or irreconcilable environment constraints"* — not by our inference, but by the original author's direct, public confirmation. Combined with six independent technical attempts (architecture, training duration, training data composition, algorithm family, supervision, and the real original algorithm itself) all converging on the same ~0.44–0.50 precision ceiling, there is nothing further to try. The replication phase is closed.
+
 ---
 
 ## Final Reporting
@@ -184,22 +214,25 @@ Learned channel coefficients: MAC-IP −7.07, IP −3.54, Jitter +3.52, IPtoIP +
 - A different algorithm family (Isolation Forest instead of autoencoder reconstruction error): no better, slightly worse — rules out the scoring mechanism as the cause
 - The real KitNET ensemble architecture (per-channel autoencoders + output combiner): no improvement — rules out the monolithic-architecture theory
 - A supervised hybrid with direct label access during threshold fitting: no improvement — rules out "lack of supervision" as the limiting factor
+- The real, original KitNET algorithm (the paper's own cited author's implementation, `m=10` as reported in Appendix C): no improvement, slightly worse — rules out "our substitute architectures are the problem"
 
-**All five attempts ruled out individually**, each targeting a genuinely different possible cause (training data composition, training duration, algorithm family, model architecture, presence of supervision). None of them moved precision or FPR meaningfully from the baseline. That consistency across five unrelated angles is itself strong evidence: the limitation is in what the 1M-row chronological training split and Kitsune's feature representation can express about this specific attack window, not in any of the modeling choices tested.
+**All six attempts ruled out individually**, each targeting a genuinely different possible cause (training data composition, training duration, algorithm family, model architecture, presence of supervision, and finally the literal original algorithm). None of them moved precision or FPR meaningfully from the baseline. A final audit of the paper, the full GitHub repo, every issue thread, and the original author's own public statements confirmed this isn't something we overlooked: core parts of the original experimental pipeline are author-confirmed lost, and the published code is author-confirmed to be simplified demo code that doesn't exactly implement the paper's described algorithm. That combination — six converging technical results plus direct author confirmation — is as complete a case as this kind of investigation can produce.
 
 ### Final metrics
 
 | | Precision | Recall | FPR |
 |---|---|---|---|
 | **Target (xNIDS paper, Table 12)** | 0.9568 | 0.9972 | 0.001 |
-| **Replicated baseline** (faithful reproduction) | 0.5001 | 1.0000 | 0.1039 |
+| **Replicated baseline** (faithful reproduction, xNIDS's substitute AE) | 0.5001 | 1.0000 | 0.1039 |
 | **Improved — Attempt 1** (full-timeline resampling) | 0.4431 | 0.0043 | 0.0006 |
 | **Improved — Attempt 2** (epoch sweep, best epoch) | 0.5004 | 1.0000 | 0.1038 |
 | **Improved — Attempt 3** (Isolation Forest) | 0.4311 | 1.0000 | 0.1372 |
 | **Improved — Attempt 4** (KitNET ensemble) | 0.4988 | 1.0000 | 0.1044 |
 | **Improved — Attempt 5** (supervised hybrid) | 0.5011 | 0.9996 | 0.1034 |
+| **Improved — Attempt 6** (real KitNET, original author's code, `m=10`) | 0.4375 | 0.9947 | 0.1329 |
 
 ### Next steps
-1. **All five attempted levers are now exhausted**: training-data composition, training duration, algorithm family, model architecture, and presence of supervision. None moved precision or FPR meaningfully from the baseline (0.50 / ~0.10), and Attempt 1 is the only one that moved anything at all — at the cost of destroying recall. This is the point at which continued iteration on the same detector/dataset pairing has a low expected return.
-2. This gap is now a thoroughly well-evidenced reproduction finding (five independent experiments, each targeting a different possible cause, all converging on the same conclusion), strong enough to stand as the capstone's documented result per the course's own grading language: *"A failed reproduction is a valid result. An undocumented one is not."*
+1. **The replication phase is closed.** All six attempted levers (training-data composition, training duration, algorithm family, model architecture, presence of supervision, and the literal original algorithm) have been exhausted. None moved precision or FPR meaningfully from the baseline (~0.44–0.50 precision, ~0.10–0.13 FPR); Attempt 1 is the only one that moved anything, at the cost of destroying recall. A final audit of the paper, repo, and author's own public statements confirmed core parts of the original pipeline are genuinely lost, not just hard to find.
+2. This gap is now an exceptionally well-evidenced reproduction finding (six independent technical experiments plus direct author confirmation), strong enough to stand as the capstone's documented result per the course's own grading language: *"A failed reproduction is a valid result. An undocumented one is not."*
+3. **Moving to the improvement phase.** With replication exhausted, further work should treat this as a known, accepted ceiling and focus on genuinely new approaches rather than variations on what's already been ruled out here.
 3. If further work is wanted beyond documentation, the remaining options are qualitatively different from anything tried here — e.g. feature engineering beyond Kitsune's own 115 features (richer temporal context than single-row statistics), or treating this as a sequence-modeling problem instead of a per-row anomaly-detection problem — not incremental tweaks to the current pipeline.

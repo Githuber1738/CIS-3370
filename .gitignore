@@ -26,6 +26,9 @@ artifacts/*.npy
 kaggle.json
 .env
 
+# personal local Claude Code settings
+.claude/settings.local.json
+
 # os
 .DS_Store
 Thumbs.db
