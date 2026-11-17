@@ -184,17 +184,46 @@ Learned channel coefficients: MAC-IP −7.07, IP −3.54, Jitter +3.52, IPtoIP +
 
 ---
 
-## Final Audit: Did the Original Authors Do Something We Missed?
+## Exhaustive Audit Log
 
-Before closing the replication phase, we went back over everything one more time — the complete paper text (all 18 pages, not just targeted keyword hits), every file in the `code-xNIDS` repository, all 14 of its GitHub issues, the full `Kitsune-py` system repo (not just the `KitNET-py` detector), and the raw Jupyter notebooks (checked for markdown commentary stripped out of the auto-exported `.py` scripts — there was none; the exports are complete).
+Before closing the replication phase, we conducted two full passes over every available source, explicitly trying not to stop at the first promising lead. This section documents both passes so the "we checked everything" claim is verifiable, not asserted.
 
-**The decisive finding came from the GitHub issues**, where the paper's first author (Feng Wei, `akafengfeng`) responds directly to other researchers asking the same kind of questions we had:
+### Pass 1 — Paper, repo files, and GitHub issues
 
-- On a user pointing out that `Scripts/explanation.py`'s `search_proper_input` doesn't implement the paper's Section 3.2 algorithm correctly (missing the `l = ⌊l/2⌋` step-halving described in the paper) (`github.com/CactiLab/code-xNIDS/issues/7` and `/issues/10`): *"this parameter is not used in the demo code... I intentionally put it out of the loop in the demo code... this function is not implemented in the demo code, since the testcases are relatively simple."* The author confirms, in his own words, that the public code is explicitly simplified **demo code**, not an exact implementation of the paper's described method.
-- On a request for the defense-rule-generation implementation (`github.com/CactiLab/code-xNIDS/issues/14`): *"The original rule generation module was managed using dozens of bash scripts and other tools. Unfortunately, since I've already graduated, I no longer have them readily available. However, with the help of large language models (LLMs) like ChatGPT or DeepSeek, you can simplify the process: just feed the explanation and a few prompts into the LLM to generate proper defense rules easily."* Core parts of the original experimental pipeline are confirmed **lost**, not merely unpublished. Note the scope precisely: this is about the downstream defense-rule-generation step (explanation → firewall rule), a different part of the xNIDS pipeline from the detection numbers in Table 12 -- the author's own suggested workaround (an LLM) applies to that lost capability specifically, not to reproducing the detection metrics this document is about. If anything, this reinforces the finding rather than offering a path back to it: even the author's own substitute is for a different problem than ours.
-- A separate user asked literally our own question — how to obtain the OS Scan dataset (`github.com/CactiLab/code-xNIDS/issues/8`) — and received the same Kaggle mirror link we already used. No alternate or curated version exists that we missed.
+- Re-read the complete paper text (all 18 pages, not just targeted keyword hits), every file in the `code-xNIDS` repository, all 14 of its GitHub issues, the full `Kitsune-py` system repo (not just the `KitNET-py` detector), and the raw Jupyter notebooks (checked for markdown commentary stripped out of the auto-exported `.py` scripts — there was none; the exports are complete).
+- **The decisive finding came from the GitHub issues**, where the paper's first author (Feng Wei, `akafengfeng`) responds directly to other researchers asking the same kind of questions we had:
+  - On a user pointing out that `Scripts/explanation.py`'s `search_proper_input` doesn't implement the paper's Section 3.2 algorithm correctly (missing the `l = ⌊l/2⌋` step-halving described in the paper) (`github.com/CactiLab/code-xNIDS/issues/7` and `/issues/10`): *"this parameter is not used in the demo code... I intentionally put it out of the loop in the demo code... this function is not implemented in the demo code, since the testcases are relatively simple."* The author confirms, in his own words, that the public code is explicitly simplified **demo code**, not an exact implementation of the paper's described method.
+  - On a request for the defense-rule-generation implementation (`github.com/CactiLab/code-xNIDS/issues/14`): *"The original rule generation module was managed using dozens of bash scripts and other tools. Unfortunately, since I've already graduated, I no longer have them readily available. However, with the help of large language models (LLMs) like ChatGPT or DeepSeek, you can simplify the process: just feed the explanation and a few prompts into the LLM to generate proper defense rules easily."* Core parts of the original experimental pipeline are confirmed **lost**, not merely unpublished. Scope precisely: this is about the downstream defense-rule-generation step (explanation → firewall rule), a different part of the xNIDS pipeline from the detection numbers in Table 12 — the author's suggested LLM workaround applies to that lost capability specifically, not to reproducing detection metrics. If anything, this reinforces the finding rather than offering a path back to it.
+  - A separate user asked literally our own question — how to obtain the OS Scan dataset (`github.com/CactiLab/code-xNIDS/issues/8`) — and received the same Kaggle mirror link we already used. No alternate or curated version exists that we missed.
 
-**Conclusion:** this satisfies the Phase 1 fallback trigger exactly as originally specified — *"missing dependencies, corrupted/unavailable code, or irreconcilable environment constraints"* — not by our inference, but by the original author's direct, public confirmation. Combined with six independent technical attempts (architecture, training duration, training data composition, algorithm family, supervision, and the real original algorithm itself) all converging on the same ~0.44–0.50 precision ceiling, there is nothing further to try. The replication phase is closed.
+### Pass 2 — Second exhaustive sweep (local code, GitHub history/forks/PRs, external sources)
+
+Conducted after Pass 1, specifically to check for anything a first pass could plausibly miss. Instructed to complete the full sweep even after finding a promising lead, rather than stop early.
+
+**Local workspace:**
+- Searched the paper for footnotes specifically (distinct from citation brackets). The paper has exactly **two** in 18 pages: #1 (the GitHub repo link, already known) and #2 (defining "evasion rate" for an unrelated related-work discussion). Nothing hidden.
+- Found and downloaded a **second copy of the paper**, hosted on the first author's personal site (`akafengfeng.github.io/papers/xNIDS.pdf`) — different file hash from our original prepub copy. Full text diff showed the only substantive difference is the exact typo fix issue #6 flagged ("DL-NIDS" → "XNIDS" in one sentence); otherwise identical content, just different PDF line-wrapping. Archived as `docs/xNIDS_authors-site-corrected-copy.pdf` (see Reference Documents, below).
+- Audited every file in `src/` for commented-out code, dead branches, and TODO/FIXME markers: **none found**. No abandoned alternate approach is sitting forgotten in a comment block.
+
+**GitHub repository, commit history, forks, and PRs (not checked in Pass 1):**
+- Commit history on `Scripts/kitsune.py`: 2 commits total ("clean" + initial) — never substantively revised since publication.
+- Commit history on `Scripts/explanation.py`: 3 commits; the one real change is exactly the bugfix issue #7 reported (already accounted for in Pass 1; confirmed via the actual diff, which matches our fetched copy exactly).
+- **All 13 forks** of `code-xNIDS` checked via GitHub's compare API: every single one is `ahead_by: 0` against upstream, including the author's own fork. Zero independent fixes or original work exists anywhere in the fork network.
+- **All 6 pull requests** (open and closed): every one is a Dependabot dependency-version bump. None touch methodology or results.
+
+**External sources:**
+- Web search for any published reproduction attempt, forum discussion, or StackOverflow thread about reproducing xNIDS's Kitsune numbers: **nothing exists**.
+- Found and checked a 2026 follow-up paper (arXiv 2607.12203) that also uses Kitsune as an explanation target: it reuses a *pre-trained* Kitsune detector as a black box for its own (different) explanation-method comparison. It never retrains Kitsune and reports no Precision/Recall/FPR — no new information.
+- Found and checked a blog review of the xNIDS paper: the "conflicting numbers" it appears to mention (0.316 vs. 0.774) are simply two different tables (Table 3's ADA fidelity score vs. Table 5's MAZ sparsity score) being conflated by the reviewer — not a real discrepancy, and not about detection metrics at all.
+
+### Conclusion
+
+This satisfies the Phase 1 fallback trigger exactly as originally specified — *"missing dependencies, corrupted/unavailable code, or irreconcilable environment constraints"* — not by inference, but by the original author's direct, public confirmation, cross-checked against a second independent sweep that turned up nothing further. Combined with six independent technical attempts (architecture, training duration, training data composition, algorithm family, supervision, and the real original algorithm itself) all converging on the same ~0.44–0.50 precision ceiling, there is no remaining untested viable path. **No further reproduction experiments were run as part of closing this phase** — the audit itself, not a new code change, is the final check. The replication phase is closed.
+
+### Reference Documents
+
+- `docs/xNIDS_sec23summer_77-wei-prepub.pdf` — our original working copy (pre-publication draft, contains the known "DL-NIDS"/"XNIDS" typo).
+- `docs/xNIDS_authors-site-corrected-copy.pdf` — the corrected copy hosted on the first author's personal site, archived here during the final audit. Content is otherwise identical.
 
 ---
 
