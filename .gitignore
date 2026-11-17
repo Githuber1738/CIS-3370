@@ -19,6 +19,9 @@ __pycache__/
 *.keras
 *.h5
 
+# large regeneratable intermediate data (regeneratable via src/models/kitsune_ensemble.py)
+artifacts/*.npy
+
 # secrets
 kaggle.json
 .env

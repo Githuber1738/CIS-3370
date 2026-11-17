@@ -132,9 +132,39 @@ This document. Kept current as Phase 3 work continues — see `docs/TASKS.md` fo
 
 **Verdict: rules out "autoencoder-specific."** A completely different algorithm family (tree-based isolation, not reconstruction error at all) hits the same wall — slightly *worse*, in fact, than the autoencoder baseline (FPR 0.1372 vs. 0.1039). This confirms the overlap between attack and attack-window-benign traffic is a property of the feature space and the chronological split itself, not an artifact of how the autoencoder scores anomalies. Kept as `src/models/kitsune_isolation_forest.py`.
 
-### Not yet attempted (next steps, see below)
-- The real KitNET algorithm (ensemble of small per-channel autoencoders with incremental correlation clustering) in place of xNIDS's substitute single monolithic autoencoder.
-- A supervised hybrid using per-channel reconstruction error (MAC-IP/IP/Jitter/IPtoIP/Socket) as features for a small classifier, built directly on the explanation-method findings (`src/explain/`) — MAC-IP dominates importance in both true and false positives, suggesting a channel-aware decision boundary might outperform one global threshold.
+### Attempt 4 — Real KitNET architecture (ensemble of per-channel autoencoders)
+
+**Hypothesis:** xNIDS's own reference script substitutes one monolithic autoencoder for Kitsune's real architecture — an ensemble of small autoencoders, one per feature cluster, combined by an output-layer autoencoder. Isolating each channel might keep one channel's disturbance from dragging down a shared global reconstruction.
+
+**Change:** built 5 small autoencoders, one per known channel (MAC-IP, IP, Jitter, IPtoIP, Socket — using the real semantic grouping confirmed from xNIDS's own code, rather than re-deriving clusters via online correlation tracking as original KitNET does). Each outputs its own RMSE per row; those 5 RMSEs feed a small output autoencoder whose reconstruction error is the final anomaly score. Same chronological split/scaling as the baseline.
+
+**Result:**
+
+| Metric | Value |
+|---|---|
+| Precision | 0.4988 |
+| Recall | 1.0000 |
+| FPR | 0.1044 |
+
+**Verdict: no improvement — rules out the architecture.** Essentially identical to the monolithic baseline (0.5001/1.0000/0.1039). Per-channel isolation doesn't help, because the overlap isn't confined to one channel acting up and contaminating a shared bottleneck — it's present across the channels generally during the attack window. Kept as `src/models/kitsune_ensemble.py`, which also saves the per-channel RMSE features for Attempt 5.
+
+### Attempt 5 — Supervised hybrid on per-channel error (explicit departure from the paper's unsupervised design)
+
+**Hypothesis:** built directly on the explanation-method finding (`src/explain/`) that MAC-IP dominates feature importance in both TP and FP samples — maybe a classifier that learns its own weighting across the 5 channels separates the classes better than one global unsupervised threshold.
+
+**Change:** reused Attempt 4's 5 per-channel RMSE features as input to a logistic regression, with `class_weight="balanced"`. This explicitly uses labels at the scoring stage — a real, flagged departure from the paper's fully unsupervised design, not a reproduction. To avoid leakage, the test set was split in half: a labeled "tune" half fits the classifier, a disjoint "report" half is the only one evaluated.
+
+**Result:**
+
+| Metric | Value |
+|---|---|
+| Precision | 0.5011 |
+| Recall | 0.9996 |
+| FPR | 0.1034 |
+
+Learned channel coefficients: MAC-IP −7.07, IP −3.54, Jitter +3.52, IPtoIP +17.27, **Socket +116.68**. Interesting on its own — the supervised fit weights Socket far more heavily than MAC-IP, the opposite of what the per-sample explanation method highlighted for individual TP/FP cases. Global linear separability across the whole channel and a single sample's local explanation aren't the same question, and this is a clean illustration of that.
+
+**Verdict: no improvement — rules out "lack of supervision."** Even with direct label access while fitting the decision boundary (an advantage the paper's method never has), the result is within noise of every other attempt. This is the strongest evidence yet that the ceiling isn't about model capability at all — it's that the 5-channel representation itself doesn't separate attack-window benign traffic from the attack, for anything that gets to see it, supervised or not.
 
 ---
 
@@ -152,6 +182,10 @@ This document. Kept current as Phase 3 work continues — see `docs/TASKS.md` fo
 - Resampling training data across the timeline: fixes FPR, destroys recall — proves the two failure modes share one cause
 - More/less training: ruled out as a factor entirely
 - A different algorithm family (Isolation Forest instead of autoencoder reconstruction error): no better, slightly worse — rules out the scoring mechanism as the cause
+- The real KitNET ensemble architecture (per-channel autoencoders + output combiner): no improvement — rules out the monolithic-architecture theory
+- A supervised hybrid with direct label access during threshold fitting: no improvement — rules out "lack of supervision" as the limiting factor
+
+**All five attempts ruled out individually**, each targeting a genuinely different possible cause (training data composition, training duration, algorithm family, model architecture, presence of supervision). None of them moved precision or FPR meaningfully from the baseline. That consistency across five unrelated angles is itself strong evidence: the limitation is in what the 1M-row chronological training split and Kitsune's feature representation can express about this specific attack window, not in any of the modeling choices tested.
 
 ### Final metrics
 
@@ -162,7 +196,10 @@ This document. Kept current as Phase 3 work continues — see `docs/TASKS.md` fo
 | **Improved — Attempt 1** (full-timeline resampling) | 0.4431 | 0.0043 | 0.0006 |
 | **Improved — Attempt 2** (epoch sweep, best epoch) | 0.5004 | 1.0000 | 0.1038 |
 | **Improved — Attempt 3** (Isolation Forest) | 0.4311 | 1.0000 | 0.1372 |
+| **Improved — Attempt 4** (KitNET ensemble) | 0.4988 | 1.0000 | 0.1044 |
+| **Improved — Attempt 5** (supervised hybrid) | 0.5011 | 0.9996 | 0.1034 |
 
 ### Next steps
-1. All three attempted levers (training-data composition, training duration, algorithm family) have now been tried and ruled out individually. The strongest remaining options are the real KitNET ensemble architecture (isolating per-channel anomalies instead of one global score) or a supervised hybrid using the per-channel reconstruction errors from `src/explain/` (MAC-IP dominates importance in both TP and FP, suggesting a channel-aware decision boundary) — both bigger lifts, but each targets the root cause from a genuinely different angle than the three attempts above.
-2. Regardless of further attempts, this gap is now a well-evidenced reproduction finding (four independent experiments pointing at the same cause), strong enough to stand as the capstone's documented result per the course's own grading language: *"A failed reproduction is a valid result. An undocumented one is not."*
+1. **All five attempted levers are now exhausted**: training-data composition, training duration, algorithm family, model architecture, and presence of supervision. None moved precision or FPR meaningfully from the baseline (0.50 / ~0.10), and Attempt 1 is the only one that moved anything at all — at the cost of destroying recall. This is the point at which continued iteration on the same detector/dataset pairing has a low expected return.
+2. This gap is now a thoroughly well-evidenced reproduction finding (five independent experiments, each targeting a different possible cause, all converging on the same conclusion), strong enough to stand as the capstone's documented result per the course's own grading language: *"A failed reproduction is a valid result. An undocumented one is not."*
+3. If further work is wanted beyond documentation, the remaining options are qualitatively different from anything tried here — e.g. feature engineering beyond Kitsune's own 115 features (richer temporal context than single-row statistics), or treating this as a sequence-modeling problem instead of a per-row anomaly-detection problem — not incremental tweaks to the current pipeline.
