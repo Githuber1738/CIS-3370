@@ -54,12 +54,39 @@ Copy a new row per experiment run. Keep hypotheses falsifiable and record the ac
 
 | ID | Date | Strategy | Hypothesis | Configuration | Precision | Recall | FPR | F1 | Verdict | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| IMP-01 | | | | | | | | | | |
-| IMP-02 | | | | | | | | | | |
-| IMP-03 | | | | | | | | | | |
+| IMP-01 | 2026-11-17 | #1 Surgical data augmentation | Noise-perturbed synthetic benign rows (never touching real attack-window data) will teach the model to tolerate mild variation without the recall collapse blind resampling caused | `src/models/kitsune_improvement_augmentation.py`: +200,000 synthetic rows (20% of train, Gaussian noise std=0.02 in [0,1]-scaled space, clipped), same architecture/epochs as baseline | 0.4997 | 1.0000 | 0.1040 | 0.6664 | No change | Within noise of baseline (0.5001/1.000/0.1039). The noise level tested was mild enough to not collapse recall (unlike replication Attempt #1) but also too mild to change what gets flagged at all — synthetic "jittered benign" doesn't resemble real attack-window benign closely enough to teach the model anything new about that regime. A stronger noise level might move this, but risks drifting back toward Attempt #1's failure mode; not retried this round. |
+| IMP-02 | 2026-11-17 | #2 Sequence/temporal modeling | A model that sees a 5-row window will distinguish true attack sequences (surrounded by other attacks) from incidental attack-adjacent benign rows (surrounded by benign) | `src/models/kitsune_improvement_sequence.py`: LSTM(32)-autoencoder, window=5, 200k subsampled training windows (stride 5), scored on last-timestep reconstruction error, 10 epochs, runtime 73.1s | 0.4161 | 1.0000 | 0.1458 | 0.5877 | Worse | FPR got worse, not better. A 5-row window apparently isn't enough context to separate the classes, or the attack-adjacent benign rows are themselves temporally clustered with OTHER attack-adjacent benign rows (i.e. the local neighborhood looks uniformly "unusual" either way), which would defeat the whole hypothesis. Worth knowing before investing in a bigger architecture here. |
+| IMP-03 | 2026-11-17 | #3 Explanation-informed post-filter | Rows where ONLY MAC-IP is elevated (and the other 4 channels look normal) are more likely incidental near-misses than real attacks, and can be safely un-flagged | `src/models/kitsune_improvement_postfilter.py`: baseline detector's 131,361 flagged test rows checked against replication Attempt #4's per-channel RMSE, suppress if MAC-IP elevated AND all 4 others below their train-calibrated threshold | 0.5001 | 1.0000 | 0.1039 | 0.6668 | No change | **The suppression rule never fired — 0 of 131,361 flags matched the condition.** When the detector flags a row during the attack window, multiple channels are elevated together, not MAC-IP alone. The underlying explanation finding (MAC-IP dominates *relative* importance in TP/FP samples) doesn't mean MAC-IP is elevated *in isolation* — it's elevated *most*, among others that are also elevated. The rule's premise doesn't hold; a magnitude-ratio rule (MAC-IP much higher than the rest, rather than "only MAC-IP crosses its own threshold") would be a different, more defensible version of this idea. |
 
 **Column guide:**
 - **Strategy**: which numbered idea above (or a new one — add it to the list first with impact/effort estimates before running it).
 - **Configuration**: exact parameters/code path, enough detail that a teammate could rerun it from this row alone.
 - **Verdict**: one of `Improved`, `No change`, `Worse`, `Inconclusive — needs rerun`.
 - **Notes**: anything that would change how the next experiment should be designed — this is the field that turns a log into a roadmap instead of a list.
+
+---
+
+## Round 1 Results: Benchmark Comparison
+
+| | Precision | Recall | FPR |
+|---|---|---|---|
+| **Target (xNIDS paper, Table 12)** | 0.9568 | 0.9972 | 0.001 |
+| Replicated baseline | 0.5001 | 1.0000 | 0.1039 |
+| IMP-01 Surgical augmentation | 0.4997 | 1.0000 | 0.1040 |
+| IMP-02 Sequence/temporal (LSTM) | 0.4161 | 1.0000 | 0.1458 |
+| IMP-03 Explanation post-filter | 0.5001 | 1.0000 | 0.1039 |
+
+**Verdict: none of the three matched or surpassed the baseline, let alone the paper's numbers.** IMP-01 and IMP-03 landed within noise of the baseline (no real effect either way); IMP-02 was measurably worse. None closed any of the gap to Table 12.
+
+**Which modification drove the largest effect:** IMP-02 (sequence modeling) — but in the wrong direction. It's also the most informative failure of the three: it directly tested whether temporal context helps, and the answer was no, at least at this window size and architecture scale. IMP-01 and IMP-03 weren't so much "tested and failed" as "tested and never got the chance to matter" — IMP-01's noise level was too mild to teach anything new, and IMP-03's trigger condition never fired. Both are inconclusive about the *idea*, conclusive about *this specific implementation* of it.
+
+---
+
+## Round 2: Next-Step Recommendations
+
+Based on what Round 1 actually showed (not a restart — each proposal below is a direct, targeted fix to why its predecessor didn't move anything):
+
+1. **Redesign IMP-03 as a ratio-based rule, not a threshold-crossing rule.** We now know flagged rows have *multiple* channels elevated together, not MAC-IP alone — so "is MAC-IP the only elevated channel" was the wrong question. The better question, directly motivated by this round's data: "is MAC-IP elevated by a much larger margin than the next-highest channel" (e.g. MAC-IP's z-score is 3x the second-highest channel's z-score). This is a small code change, cheap to test, and directly informed by IMP-03's own result rather than a guess.
+2. **Retry IMP-01 with noise drawn from the real attack-window-benign distribution, not generic Gaussian noise.** The replication phase already characterized exactly how attack-window benign rows differ from ordinary benign rows (concentrated in test rows ~279k-488k, see `Kitsune_Replication.md`). Sampling synthetic perturbations from *that* empirical difference, rather than an arbitrary noise scale, is a more principled version of the same idea and more likely to actually teach the model something, without reintroducing real attack-adjacent rows (which is what collapsed recall in replication Attempt #1).
+3. **One more sequence-modeling attempt at a larger window (10-20 rows) before abandoning that direction**, specifically because IMP-02 got *worse*, not merely unchanged — worth distinguishing "5 rows isn't enough context" from "temporal context doesn't help at all" before writing off the whole approach. Cheap to test (73s runtime at window=5); a 2-4x larger window is still fast.
+4. **De-prioritized for now:** alternative loss functions, ensemble/voting across IMP-01/02/03's predictions, and further threshold calibration. All three IMP- experiments landed in the same narrow band (~0.10-0.15 FPR, ~0.42-0.50 precision) as every replication-phase attempt — consistent with a shared information ceiling, not a model-fitting problem. Averaging or re-weighting predictions that all sit in the same place is unlikely to produce something meaningfully different; the replication phase's own threshold sweep already showed calibration specifically doesn't move this. Revisit only if 1-3 produce a genuinely different result worth combining with something else.
