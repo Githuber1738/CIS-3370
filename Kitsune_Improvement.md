@@ -93,3 +93,38 @@ Based on what Round 1 actually showed (not a restart — each proposal below is 
 2. **Retry IMP-01 with noise drawn from the real attack-window-benign distribution, not generic Gaussian noise.** The replication phase already characterized exactly how attack-window benign rows differ from ordinary benign rows (concentrated in test rows ~279k-488k, see `Kitsune_Replication.md`). Sampling synthetic perturbations from *that* empirical difference, rather than an arbitrary noise scale, is a more principled version of the same idea and more likely to actually teach the model something, without reintroducing real attack-adjacent rows (which is what collapsed recall in replication Attempt #1).
 3. **One more sequence-modeling attempt at a larger window (10-20 rows) before abandoning that direction**, specifically because IMP-02 got *worse*, not merely unchanged — worth distinguishing "5 rows isn't enough context" from "temporal context doesn't help at all" before writing off the whole approach. Cheap to test (73s runtime at window=5); a 2-4x larger window is still fast.
 4. **De-prioritized for now:** alternative loss functions, ensemble/voting across IMP-01/02/03's predictions, and further threshold calibration. All three IMP- experiments landed in the same narrow band (~0.10-0.15 FPR, ~0.42-0.50 precision) as every replication-phase attempt — consistent with a shared information ceiling, not a model-fitting problem. Averaging or re-weighting predictions that all sit in the same place is unlikely to produce something meaningfully different; the replication phase's own threshold sweep already showed calibration specifically doesn't move this. Revisit only if 1-3 produce a genuinely different result worth combining with something else.
+
+---
+
+## Round 2 Results: Updated Cumulative Comparison
+
+Executed sequentially (2.1 → 2.2 → 2.3), reviewing and logging each before starting the next, per the Round 2 execution constraint.
+
+| | Precision | Recall | FPR |
+|---|---|---|---|
+| **Target (xNIDS paper, Table 12)** | 0.9568 | 0.9972 | 0.001 |
+| Replicated baseline | 0.5001 | 1.0000 | 0.1039 |
+| Round 1 best (IMP-01/03, tied, no real effect) | 0.5001–0.4997 | 1.0000 | 0.1039–0.1040 |
+| Round 1 worst (IMP-02, window=5 LSTM) | 0.4161 | 1.0000 | 0.1458 |
+| IMP-04 (Round 2, Exp 2.1: ratio post-filter) | 0.5002 | 0.9620 | 0.0999 |
+| IMP-05 (Round 2, Exp 2.2: targeted augmentation) | 0.5004 | 1.0000 | 0.1038 |
+| IMP-06 (Round 2, Exp 2.3: window=15 LSTM) | 0.2766 | ~1.0000 | 0.2718 |
+
+**Performance verdict: Round 2 did not bridge the gap — if anything, it sharpened the picture of why.** Nothing in either round came close to the paper's numbers. More importantly, Round 2 specifically tested the *best, most targeted version* of each Round 1 idea (a ratio instead of a threshold, the real measured shift instead of generic noise, 3x more context instead of too little) and every one of those improved versions either made no real difference or made things measurably worse. IMP-05 in particular is the cleanest negative result in the whole project: using the exact real distributional shift, properly leak-controlled, produced a 4-row difference out of 71,848 on the exact population it targeted. We have plateaued, and the plateau is well-characterized rather than merely assumed.
+
+---
+
+## Phase 3: Beyond Standard Tuning
+
+### Brainstormed unconventional strategies, ranked
+
+1. **Adaptive/local threshold instead of a single global one (most promising, cheapest to test).** Rather than training a new model, compute a rolling average of the EXISTING baseline detector's per-row reconstruction error over a short trailing window (e.g. 50-100 rows) as a live "local disturbance level," and raise the flagging threshold when that local level is already elevated — the logic being that during any genuinely disturbed network period, some baseline elevation in benign traffic is expected, so the bar for flagging an individual row should rise with it, reserved for rows far above even the locally-elevated norm. This is conceptually different from everything tried (no new model, context via a simple statistic rather than a learned sequence model) and cheap enough to test in under an hour.
+2. **Richer features from the raw packets.** Every experiment so far, in both replication and improvement, used Kitsune's same 115 pre-extracted features. The OS Scan scenario's raw pcap (333MB, deliberately skipped when downloading to save bandwidth) could be reprocessed for additional payload- or protocol-level features not in Kitsune's original 115. This is a genuinely different information source, not a reweighting of what's already been tried — but it's a real time investment, not a quick experiment.
+3. **Pseudo-labeling / self-training.** Use the model's own highest-confidence predictions to iteratively retrain. Flagged here mainly for completeness: given recall is already 1.0 (nothing confidently-attack is being missed) and the entire problem is benign-side confusion, self-training is unlikely to manufacture information the feature representation doesn't already contain — low expected value.
+4. **Ensemble/voting across all detectors built so far** (monolithic AE, real KitNET, Isolation Forest, LSTM). De-prioritized: these different algorithms land in the same ~0.10-0.27 FPR band and, from the replication phase's own diagnosis, are likely flagging substantially the same rows (the same attack-window population), since the underlying cause is shared. Voting across detectors that agree isn't expected to change the outcome.
+
+### Project Closure Recommendation
+
+**Further quick experimentation has clearly diminishing returns.** Twelve experiments now (six in replication, six in improvement — IMP-01 through IMP-06), each targeting a genuinely different possible cause, plus a two-pass exhaustive document/code/community audit, have all converged on the same conclusion: this is an information ceiling in Kitsune's 115-feature representation during this specific attack window, not a model-fitting problem any of the standard levers can fix.
+
+**Recommendation: close this round of experimentation and move to packaging the findings.** If there's remaining appetite and time, strategy #1 above (adaptive local threshold) is cheap enough to be worth one more shot since it's genuinely untested territory — but it should not block finishing the Wiki report, repo hygiene, and presentation prep, all of which are time-boxed by the Dec 1/3 deadline in a way that further modeling experiments are not. The empirical record built across both documents (`Kitsune_Replication.md` and this one) is already a strong, well-evidenced capstone result on its own terms.
