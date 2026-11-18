@@ -184,6 +184,27 @@ Learned channel coefficients: MAC-IP −7.07, IP −3.54, Jitter +3.52, IPtoIP +
 
 ---
 
+## Addendum: The Original Kitsune (NDSS 2018) Paper's Actual Evaluation Protocol
+
+Found and read after the replication phase was first closed, while answering a direct question about further improvement avenues. Both `KitNET-py` and `Kitsune-py` list a file named `Kitsune paper.pdf` -- the original NDSS 2018 paper this whole detector is from -- that had been downloaded code from but never actually opened. Reading it resolved the last open methodological question.
+
+**Confirms our split is exactly right.** The paper states directly: *"with the OS Scan dataset, each algorithm was trained on the first one million packets, and then executed on the remaining 697,851 packets."* Identical to what we, and xNIDS's own reference script, have used throughout.
+
+**Reveals the real evaluation protocol, and it is NOT what we (or xNIDS's script) use.** The paper states: *"we measure an algorithm's true positive rate (TPR)... when φ [the threshold] is selected so that the false positive rate (FPR) is very low (i.e., 0.001)."* This is a fixed-FPR operating-point evaluation: the threshold is deliberately chosen to force FPR to a target value, and recall is whatever results at that point -- not a threshold derived from the training distribution's statistics (mean + 2σ), which is what every attempt in this project (and xNIDS's own `Scripts/kitsune.py`) does instead.
+
+**Tested directly rather than assumed.** Forced our own trained model's threshold to the percentile of the test benign-error distribution that produces exactly FPR = 0.001 (the paper's own target), and measured recall at that point:
+
+| Metric | Value |
+|---|---|
+| Threshold | 0.359215 |
+| Precision | 0.6649 |
+| Recall | **0.0191** |
+| FPR | 0.0010 |
+
+**This is the single most decisive result in the entire investigation.** At the exact operating point the paper reports (FPR = 0.001), our model catches only 1,256 of 65,700 attacks (1.9% recall) -- nowhere near the paper's claimed 0.9972. This holds regardless of which evaluation philosophy is used: the paper's own fixed-FPR protocol, applied directly to our model, does not produce anything resembling their numbers. The gap is not a threshold-selection artifact; it is a property of the detector's actual score distribution on this data, at any operating point along its ROC curve.
+
+---
+
 ## Exhaustive Audit Log
 
 Before closing the replication phase, we conducted two full passes over every available source, explicitly trying not to stop at the first promising lead. This section documents both passes so the "we checked everything" claim is verifiable, not asserted.
