@@ -245,6 +245,33 @@ The one remaining untested idea from the brainstorm list — replacing the stati
 
 ---
 
+## Reproducibility Fix: TensorFlow/Keras Training Was Never Seeded
+
+Found during a full repo audit (2026-11-19): `kitsune_autoencoder.py` has had a `RANDOM_SEED = 42` constant since its first version, but it was never actually used anywhere. RobustScaler/MinMaxScaler have no randomness, so the scaled data was always identical run to run -- but the autoencoder's own weight initialization and dropout masks were not seeded, so retraining the "same" model produced slightly different precision/recall/FPR every time. This was visible informally across the project's many retrains (e.g. baseline precision ranging 0.4988-0.5011 across different scripts/runs that should have been identical), but had never been isolated and fixed as its own issue.
+
+### The fix needed two parts, not one
+
+**Part 1 -- `keras.utils.set_random_seed(RANDOM_SEED)`**, called immediately before model construction, seeds Python's `random`, NumPy's RNG, and TensorFlow's RNG together. Tested directly: two separate process launches of the seeded baseline gave **0.5003** (fp=65634) and **0.5004** (fp=65606) -- closer than before (a ~20x tighter spread than the historical 0.4988-0.5011 range) but **not bit-identical**.
+
+**Part 2 -- `tf.config.experimental.enable_op_determinism()`**, added on top of the seed. CPU TensorFlow's parallel floating-point reductions (e.g. in dense-layer matrix multiplication) aren't guaranteed to sum in the same order across runs unless this is explicitly forced, which is a separate issue from weight-initialization seeding. With both in place, two more separate process launches gave **exactly 0.5003** (tp=65700, tn=566517, fp=65634, fn=0) **both times** -- true bit-exact reproducibility, confirmed across 2 independent runs after 2 runs of the partial fix showed it wasn't sufficient alone.
+
+Applied to `kitsune_autoencoder.py`, `kitsune_ensemble.py`, and `kitsune_improvement_delta_features.py` (one baseline-architecture script, one multi-model script, one Round 3 experiment -- chosen to span the kinds of scripts in this project).
+
+### Before (unseeded, historical) vs. after (fully deterministic)
+
+| Experiment | Metric | Before | After | Conclusion affected? |
+|---|---|---|---|---|
+| Baseline | Precision / Recall / FPR | 0.5001 / 1.0000 / 0.1039 | 0.5003 / 1.0000 / 0.1038 | No |
+| Ensemble (Attempt #4) | Precision / Recall / FPR | 0.4988 / 1.0000 / 0.1044 | 0.4995 / 1.0000 / 0.1041 | No |
+| Delta features (IMP-07) | Precision / Recall / FPR | 0.3368 / 0.0299 / 0.0061 | 0.3036 / 0.0300 / 0.0071 | No |
+| Delta features (IMP-07) | Recall @ forced FPR=0.001 | 0.0042 | 0.0042 | No |
+
+**None of the three experiments' conclusions changed.** The baseline and ensemble numbers moved by less than 0.001 in every metric -- noise, not signal. Delta features moved a bit more in precision/FPR (0.3368→0.3036, 0.0061→0.0071) since it's being compared against a genuinely different unseeded historical run rather than another seeded one, but the result that actually matters -- the recall collapse (0.0299→0.0300) and the recall-at-forced-FPR=0.001 (0.0042, unchanged exactly) -- is identical. This is exactly what should happen: this was a rigor/hygiene fix, not a result-changing one. The project's central finding (benign traffic inside the attack window is structurally inseparable from the attack in this feature space) was never sensitive to which particular random initialization a model happened to land on -- sixteen experiments converging on the same wall from completely different angles was already strong evidence of that, and this is now direct, isolated confirmation of it.
+
+The other ~15 training scripts in this project were not retrofitted with this fix -- see the scope note in `docs/TASKS.md`'s 2026-11-19 full-audit entry for why, and the fix is there (`keras.utils.set_random_seed(RANDOM_SEED)` + `tf.config.experimental.enable_op_determinism()`, immediately before model construction) for anyone who wants to apply it to a specific other script.
+
+---
+
 ## Exhaustive Audit Log
 
 Before closing the replication phase, we conducted two full passes over every available source, explicitly trying not to stop at the first promising lead. This section documents both passes so the "we checked everything" claim is verifiable, not asserted.

@@ -25,6 +25,7 @@ from src.ingestion.kitsune import load_kitsune
 from src.models.kitsune_autoencoder import MODEL_DIR, evaluate
 
 SPLIT_INDEX = 1_000_000
+RANDOM_SEED = 42
 GROUP_SIZES = [15, 15, 15, 35, 35]
 GROUP_NAMES = ["MAC-IP", "IP", "Jitter", "IPtoIP", "Socket"]
 
@@ -67,6 +68,10 @@ def main():
     minmax = MinMaxScaler().fit(np.vstack([X_train_s, X_test_s]))
     X_train_s = minmax.transform(X_train_s)
     X_test_s = minmax.transform(X_test_s)
+
+    import tensorflow as _tf
+    keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
 
     slices = group_slices()
     train_group_rmse = np.zeros((len(X_train_s), len(slices)))

@@ -26,6 +26,7 @@ from src.ingestion.kitsune import load_kitsune
 from src.models.kitsune_autoencoder import MODEL_DIR, build_autoencoder, evaluate
 
 SPLIT_INDEX = 1_000_000
+RANDOM_SEED = 42
 
 
 def main():
@@ -57,6 +58,10 @@ def main():
 
     print("Building and training autoencoder on delta features...")
     t_train_start = time.time()
+    import tensorflow as _tf
+    from tensorflow import keras as _keras
+    _keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     autoencoder = build_autoencoder(X_train_s.shape[1])
     history = autoencoder.fit(X_train_s, X_train_s, epochs=10, batch_size=5000, verbose=2)
     train_time = time.time() - t_train_start

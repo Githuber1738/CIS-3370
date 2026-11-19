@@ -37,6 +37,19 @@ never saw this network condition in its training split (the first
 1M rows, which predate the attack entirely), so no amount of
 hyperparameter tuning closes this; it's a training-data coverage gap
 inherent to the paper's own prescribed chronological split.
+
+Reproducibility fix (2026-11-19): a `RANDOM_SEED` constant has existed
+here since the first version of this file but was never actually wired
+up -- RobustScaler/MinMaxScaler have no randomness, so the scaled data
+was always identical run to run, but the autoencoder's own weight
+initialization and dropout masks were not seeded, so retraining
+produced slightly different precision/recall/FPR each time (we saw
+this informally across the project's many retrains: numbers like
+0.4995-0.5003 for the "same" baseline). Found during a full repo audit
+and now fixed via `keras.utils.set_random_seed(RANDOM_SEED)`,
+immediately before model construction. See docs/TASKS.md's 2026-11-19
+entries and Kitsune_Replication.md's Reproducibility Fix section for
+the direct before/after comparison this produced.
 """
 
 from pathlib import Path
@@ -118,6 +131,10 @@ def main():
     X_test_s = minmax.transform(X_test_s)
 
     print("Building and training autoencoder...")
+    import tensorflow as _tf
+    from tensorflow import keras as _keras
+    _keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seeding alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     autoencoder = build_autoencoder(X_train_s.shape[1])
     autoencoder.fit(X_train_s, X_train_s, epochs=10, batch_size=5000, verbose=2)
 
