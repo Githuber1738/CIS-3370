@@ -205,6 +205,46 @@ Found and read after the replication phase was first closed, while answering a d
 
 ---
 
+## Root-Cause Diagnostics: Label Granularity & Entity Aggregation
+
+Two final diagnostic checks, run after the Addendum, to strengthen the root-cause documentation before locking the experimental phase. Both are inspection/analysis of existing data and scores — no retraining.
+
+### Diagnostic A: Label-Window Alignment & Ground-Truth Granularity
+
+**Question:** are all packets inside the attack time window blanket-labeled `1`, or only the actual scan packets (with victim replies and background chatter correctly labeled `0`)? And can our false positives be attributed to specific IPs (scanner vs. victim-reply vs. unrelated)?
+
+**Metadata check, confirmed directly:** neither `OS_Scan_dataset.csv` (115 processed statistical features, headerless) nor `OS_Scan_labels.csv` (a single binary column) contains any IP, MAC, or packet-flag information — verified by inspecting both files' raw columns and the Kaggle dataset's file listing. The *only* place that information exists is `OS_Scan_pcap.pcapng`, the raw 333MB packet capture, which was deliberately never downloaded (see `README.md`'s Setup section — the two CSVs are sufficient for the feature-level reproduction this project targets). Recovering per-packet source/destination IPs would require downloading that capture and re-running Kitsune's own feature-extraction pipeline to re-align rows to packets — a new, multi-day engineering effort, not a lightweight diagnostic. **This part of the question cannot be answered further without that work**, and we are explicitly not taking it on at this stage of the project.
+
+**Label-structure check, answerable without IP data, and genuinely informative:**
+
+| | Value |
+|---|---|
+| Attack-labeled rows | 65,700 |
+| First / last attack row (absolute index) | 1,314,658 / 1,576,578 |
+| Span covered (last − first) | 261,921 rows |
+| Number of separate contiguous label==1 runs within that span | **34,069** |
+| Density of label==1 within the span | **25.1%** |
+
+This rules out the assumption (implicit in earlier phases of this project, which informally called this a "265k-row attack window") that the ground truth is a crude time-range stamp covering every packet during the attack. It is not. The labels are scattered across 34,069 separate short runs, and only about a quarter of rows inside that span are actually marked malicious — consistent with per-packet or per-criterion labeling (e.g., only the scanner's own probe packets), with the remaining ~75% of rows in that span being correctly-labeled benign traffic that merely co-occurs in time with the scan.
+
+**This strengthens, not weakens, the project's core finding.** Our false positives inside that span are not a labeling-granularity artifact (i.e., not "the ground truth itself blanket-stamped good traffic as bad and we're being unfairly penalized") — they are rows genuinely and correctly labeled benign that the model nonetheless flags as anomalous. That is a real detector limitation, not a dataset-labeling artifact, which is a more defensible thing to report.
+
+### Diagnostic B: Flow-Level / Entity-Level Aggregation
+
+**Question:** if we aggregated anomaly scores by source IP (or another entity key) across short windows, would the sustained scanning host separate cleanly from diffused background chatter?
+
+**Confirmed: no entity identifier exists in the data we have.** Same finding as Diagnostic A — the processed feature matrix has no source IP, MAC, or flow ID column to group by, and the raw pcap that would contain one was not downloaded. There is no proxy categorical key in the 115 features either; they are continuous statistics, not identifiers.
+
+One nuance worth recording: Kitsune's own feature extraction is *already* entity-conditioned internally — the five channels (MAC-IP, IP, Jitter, IPtoIP, Socket) are each computed as incremental, exponentially-decayed statistics keyed by MAC/IP pairs, before the identity key itself is discarded and only the resulting statistics are emitted as the 115 output columns. So "entity-aware" processing already happened upstream of what we receive; what we don't have is the ability to reverse it back into groupable entities.
+
+The closest thing to entity/window aggregation we *can* and did test without IP data is temporal-row-window aggregation — treating consecutive rows as a proxy for "the same local activity" instead of grouping by true source identity. That is exactly what the LSTM sequence experiments (IMP-02, window=5; IMP-06, window=15) already tested, and in both cases it made FPR *worse*, not better (0.1039 → 0.1458 → 0.2718 as window size grew). We do not have a basis to expect a hand-rolled row-window aggregation of the baseline's scores to behave differently from an architecture built specifically to learn from that same windowed context, so this line of inquiry is treated as already answered rather than re-tested from scratch.
+
+### IMP-09: Adaptive Local Threshold (logged in full in `Kitsune_Improvement.md`)
+
+The one remaining untested idea from the brainstorm list — replacing the static global threshold with a rolling local one — was run as the final experiment. It did not help; see `Kitsune_Improvement.md`'s Round 4 section for the full result and why it fits the same sustained-elevation pattern established by IMP-07.
+
+---
+
 ## Exhaustive Audit Log
 
 Before closing the replication phase, we conducted two full passes over every available source, explicitly trying not to stop at the first promising lead. This section documents both passes so the "we checked everything" claim is verifiable, not asserted.
