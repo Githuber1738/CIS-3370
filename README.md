@@ -26,7 +26,8 @@ CIS 3370 (Intrusion Detection Systems) capstone project, University of the Incar
 IDS_Aegis/
 ├── README.md
 ├── Kitsune_Replication.md      # closed: why we can't match the paper's numbers, in full
-├── Kitsune_Improvement.md      # in progress: experiments attempting to close the gap anyway
+├── Kitsune_Improvement.md      # closed: 16 experiments attempting to close the gap anyway
+├── Kitsune_Explanation_Fidelity.md  # closed: ADA/MAZ explanation fidelity + sparsity (US-07)
 ├── requirements.txt
 ├── .gitignore
 ├── config/
@@ -35,13 +36,17 @@ IDS_Aegis/
 │   ├── nsl_kdd/                  # reference only, not active
 │   ├── kitsune/os_scan/          # active dataset
 │   └── cic_dos2017/              # reference only, not active
-├── artifacts/                    # small derived evidence (explanation samples); large .npy gitignored
+├── artifacts/                    # derived evidence; direct children *.npy are gitignored
+│                                  # (regenerate via src/models/kitsune_ensemble.py), nested .npy are tracked
 ├── models/                       # trained model files, gitignored (regenerate via src/models/*.py)
 ├── scripts/
-│   ├── download_kitsune.sh       # the one actively used
+│   ├── download_kitsune.sh       # background on scenario selection; Setup below uses the kaggle CLI directly
 │   ├── download_nsl_kdd.sh       # reference
 │   ├── download_cic_dos2017.sh   # reference
-│   └── download_all.sh
+│   ├── download_all.sh
+│   ├── visualize_timeline.py, visualize_latent_overlap.py, visualize_comparison.py  # presentation visuals
+│   ├── live_inference_demo.py    # live demo: streams real inference with running metrics
+│   └── diagnostic_label_structure.py
 ├── src/
 │   ├── ingestion/                # dataset loaders (kitsune.py is the active one)
 │   ├── preprocessing/            # empty — scaling/encoding lives inline in src/models/ scripts
@@ -83,6 +88,15 @@ python -m src.explain.run_explanation                 # run the xNIDS explanatio
 ```
 
 Every replication and improvement experiment is its own script under `src/models/kitsune_*.py` or `src/models/kitsune_improvement_*.py` — run any of them the same way (`python -m src.models.<name>`). Each prints its own results; see `Kitsune_Replication.md` / `Kitsune_Improvement.md` for what each one tested and found.
+
+**Presentation visuals** (`python -m scripts.<name>`):
+```bash
+python -m scripts.visualize_timeline         # error-vs-row plot; caches scores once, then no TensorFlow needed
+python -m scripts.live_inference_demo        # live streamed inference with running precision/recall/FPR
+python -m scripts.visualize_comparison       # grouped bar chart from Kitsune_Improvement.md's verified numbers
+python -m src.models.kitsune_ensemble        # run this first if it hasn't been --
+python -m scripts.visualize_latent_overlap   # -- needed to regenerate artifacts/kitsune_*_group_rmse.npy (gitignored, large)
+```
 
 ## Team roles & project history
 
