@@ -150,7 +150,7 @@ This document. Kept current as Phase 3 work continues — see `docs/TASKS.md` fo
 
 ### Attempt 5 — Supervised hybrid on per-channel error (explicit departure from the paper's unsupervised design)
 
-**Hypothesis:** built directly on the explanation-method finding (`src/explain/`) that MAC-IP dominates feature importance in both TP and FP samples — maybe a classifier that learns its own weighting across the 5 channels separates the classes better than one global unsupervised threshold.
+**Hypothesis:** built directly on the explanation-method finding (`src/explain/`) that MAC-IP dominates feature importance in both TP and FP samples — maybe a classifier that learns its own weighting across the 5 channels separates the classes better than one global unsupervised threshold. *(Correction, 2026-11-19: this motivating finding was based on a coefficient-alignment bug in `kitsune_explanation.py` — see docs/TASKS.md's 2026-11-19 correction entry. The corrected result shows IP, not MAC-IP, dominates. This hypothesis's actual test — a supervised classifier over the 5-channel RMSE signal, a separate computation from the lasso coefficients — and its result below are unaffected by the bug.)*
 
 **Change:** reused Attempt 4's 5 per-channel RMSE features as input to a logistic regression, with `class_weight="balanced"`. This explicitly uses labels at the scoring stage — a real, flagged departure from the paper's fully unsupervised design, not a reproduction. To avoid leakage, the test set was split in half: a labeled "tune" half fits the classifier, a disjoint "report" half is the only one evaluated.
 

@@ -36,6 +36,8 @@ Ranked by expected impact vs. implementation effort. Each is explicitly a new an
 
 ### 3. Explanation-informed rule-based post-filter (Medium impact, Medium effort)
 **Idea:** Directly reuses the `src/explain/` investment. We know MAC-IP dominates importance in both TP and FP explanations (a near-miss signature). Build a secondary heuristic layer: when the primary detector flags a row, check whether the *other* four channels (IP/Jitter/IPtoIP/Socket) also show elevated error — if only MAC-IP is elevated and the rest look normal, downweight the flag. This is a concrete, explainability-driven idea rather than a blind architecture swap, and ties the improvement phase back to work already done rather than starting over.
+
+*(Correction, 2026-11-19: "MAC-IP dominates" was based on a coefficient-alignment bug in `kitsune_explanation.py`, fixed while building US-07 — see docs/TASKS.md's 2026-11-19 correction entry. The corrected explanation finding is IP, not MAC-IP. IMP-03 and IMP-04 below tested a channel-dominance idea using per-channel RMSE from the ensemble model (Attempt #4) — a separate signal from the lasso coefficients — so their measured results are unaffected; only this paragraph's stated motivation needed the note.)*
 **Risk:** needs careful leak-free calibration (the "other channels normal" threshold itself needs to be fit on benign-only data, same discipline as everything else in this project).
 
 ### 4. Feature engineering: log-transform before scaling (Low impact, Low effort)

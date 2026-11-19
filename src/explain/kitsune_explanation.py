@@ -134,7 +134,17 @@ class KitsuneExplanation:
         )
         train_idx, test_idx = asgl.train_test_split(nrows=x.shape[0], train_pct=0.7, random_state=1)
         asgl_model.fit(x=x[train_idx, :], y=y[train_idx], group_index=group_index)
-        self.coef = np.array(asgl_model.coef_[0])
+        coef_with_intercept = np.array(asgl_model.coef_[0])
+        # asgl's sgl() solver (checked against the pinned 1.0.6 source)
+        # prepends the intercept as its own size-1 group when intercept=True,
+        # so coef_[0] is [intercept, feat_0, ..., feat_114] -- length 116,
+        # not 115. Bug found while building US-07 (fidelity_sparsity.py):
+        # without stripping it, every group below is shifted by one index
+        # and the true last feature (feat_114) is silently dropped from
+        # every group entirely. Confirmed empirically: coef_with_intercept
+        # has shape (116,) for 115 input features.
+        self.intercept = float(coef_with_intercept[0])
+        self.coef = coef_with_intercept[1:]
         return self.coef
 
     def group_importance(self, group_names=KITSUNE_GROUP_NAMES):
