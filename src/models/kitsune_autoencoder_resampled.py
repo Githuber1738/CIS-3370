@@ -64,6 +64,10 @@ def main():
     X_test_s = minmax.transform(X_test_s)
 
     print("Building and training autoencoder (same architecture as the baseline)...")
+    import tensorflow as _tf
+    from tensorflow import keras as _keras
+    _keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     autoencoder = build_autoencoder(X_train_s.shape[1])
     autoencoder.fit(X_train_s, X_train_s, epochs=10, batch_size=5000, verbose=2)
 

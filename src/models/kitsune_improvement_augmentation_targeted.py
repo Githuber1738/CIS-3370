@@ -78,6 +78,10 @@ def main():
 
     print("Building and training autoencoder...")
     t_train_start = time.time()
+    import tensorflow as _tf
+    from tensorflow import keras as _keras
+    _keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     autoencoder = build_autoencoder(X_train_combined.shape[1])
     history = autoencoder.fit(X_train_combined, X_train_combined, epochs=10, batch_size=5000, verbose=2)
     train_time = time.time() - t_train_start

@@ -255,9 +255,9 @@ Found during a full repo audit (2026-11-19): `kitsune_autoencoder.py` has had a 
 
 **Part 2 -- `tf.config.experimental.enable_op_determinism()`**, added on top of the seed. CPU TensorFlow's parallel floating-point reductions (e.g. in dense-layer matrix multiplication) aren't guaranteed to sum in the same order across runs unless this is explicitly forced, which is a separate issue from weight-initialization seeding. With both in place, two more separate process launches gave **exactly 0.5003** (tp=65700, tn=566517, fp=65634, fn=0) **both times** -- true bit-exact reproducibility, confirmed across 2 independent runs after 2 runs of the partial fix showed it wasn't sufficient alone.
 
-Applied to `kitsune_autoencoder.py`, `kitsune_ensemble.py`, and `kitsune_improvement_delta_features.py` (one baseline-architecture script, one multi-model script, one Round 3 experiment -- chosen to span the kinds of scripts in this project).
+Initially applied to 3 scripts to prove the mechanism (`kitsune_autoencoder.py`, `kitsune_ensemble.py`, `kitsune_improvement_delta_features.py`), then extended to every remaining script that trains a fresh Keras model from scratch, for complete documentation: `kitsune_autoencoder_resampled.py` (Attempt #1), `kitsune_autoencoder_epoch_sweep.py` (Attempt #2), `kitsune_improvement_augmentation.py` (IMP-01), `kitsune_improvement_augmentation_targeted.py` (IMP-05), `kitsune_improvement_conditional.py` (IMP-08), `kitsune_improvement_sequence.py` (IMP-02), and `kitsune_improvement_sequence_v2.py` (IMP-06) -- 10 scripts in total. Three scripts were deliberately left unfixed: `kitsune_isolation_forest.py` and `kitsune_supervised_hybrid.py` use only scikit-learn, already fully seeded (`random_state=42`); `kitsune_real_kitnet.py` uses the vendored KitNET algorithm, not TensorFlow at all, and its own autoencoder component (`src/third_party/kitnet/dA.py`) already had a hardcoded `numpy.random.RandomState(1234)` seed from the original authors, so it was already deterministic.
 
-### Before (unseeded, historical) vs. after (fully deterministic)
+### Before (unseeded, historical) vs. after (fully deterministic) -- all 10 fixed experiments
 
 | Experiment | Metric | Before | After | Conclusion affected? |
 |---|---|---|---|---|
@@ -265,10 +265,28 @@ Applied to `kitsune_autoencoder.py`, `kitsune_ensemble.py`, and `kitsune_improve
 | Ensemble (Attempt #4) | Precision / Recall / FPR | 0.4988 / 1.0000 / 0.1044 | 0.4995 / 1.0000 / 0.1041 | No |
 | Delta features (IMP-07) | Precision / Recall / FPR | 0.3368 / 0.0299 / 0.0061 | 0.3036 / 0.0300 / 0.0071 | No |
 | Delta features (IMP-07) | Recall @ forced FPR=0.001 | 0.0042 | 0.0042 | No |
+| Resampled (Attempt #1) | Precision / Recall / FPR | 0.4431 / 0.0043 / 0.0006 | 0.4901 / 0.0064 / 0.0007 | No |
+| Epoch sweep (Attempt #2), epoch 1 | Precision / Recall / FPR | 0.4995 / 1.0000 / 0.1041 | 0.4995 / 1.0000 / 0.1041 | No (identical) |
+| Epoch sweep (Attempt #2), epoch 15 | Precision / Recall / FPR | 0.5003 / 1.0000 / 0.1038 | 0.5003 / 1.0000 / 0.1038 | No (identical) |
+| Augmentation (IMP-01) | Precision / Recall / FPR | 0.4997 / 1.0000 / 0.1040 | 0.5001 / 1.0000 / 0.1039 | No |
+| Targeted augmentation (IMP-05), full test | Precision / Recall / FPR | 0.5004 / 1.0000 / 0.1038 | 0.5003 / 1.0000 / 0.1038 | No |
+| Targeted augmentation (IMP-05), held-out eval-half FPR | FPR (FP count) | 0.4570 (32,835) | 0.4570 (32,832) | No |
+| Conditional autoencoder (IMP-08) | Precision / Recall / FPR | 0.4976 / 1.0000 / 0.1049 | 0.4816 / 1.0000 / 0.1119 | No |
+| Conditional autoencoder (IMP-08) | Recall @ forced FPR=0.001 | 0.0183 | 0.0102 | No |
+| Sequence, window=5 (IMP-02) | Precision / Recall / FPR | 0.4161 / 1.0000 / 0.1458 | **0.2766 / 1.0000 / 0.2719** | **See below** |
+| Sequence, window=15 (IMP-06) | Precision / Recall / FPR | 0.2766 / ~1.0000 / 0.2718 | **0.2766 / 1.0000 / 0.2718** | **See below** |
 
-**None of the three experiments' conclusions changed.** The baseline and ensemble numbers moved by less than 0.001 in every metric -- noise, not signal. Delta features moved a bit more in precision/FPR (0.3368→0.3036, 0.0061→0.0071) since it's being compared against a genuinely different unseeded historical run rather than another seeded one, but the result that actually matters -- the recall collapse (0.0299→0.0300) and the recall-at-forced-FPR=0.001 (0.0042, unchanged exactly) -- is identical. This is exactly what should happen: this was a rigor/hygiene fix, not a result-changing one. The project's central finding (benign traffic inside the attack window is structurally inseparable from the attack in this feature space) was never sensitive to which particular random initialization a model happened to land on -- sixteen experiments converging on the same wall from completely different angles was already strong evidence of that, and this is now direct, isolated confirmation of it.
+**Eight of the ten hold up exactly as expected: the baseline, ensemble, both epoch-sweep checkpoints, both augmentation variants, and delta features all moved by noise-level amounts or not at all, and none of their conclusions change.** The conditional autoencoder (IMP-08) moved somewhat more (precision 0.4976→0.4816, recall@FPR=0.001 roughly halved from 0.0183→0.0102) but the conclusion is unaffected either way: it still performs essentially like the unconditioned baseline, nowhere near the paper's target.
 
-The other ~15 training scripts in this project were not retrofitted with this fix -- see the scope note in `docs/TASKS.md`'s 2026-11-19 full-audit entry for why, and the fix is there (`keras.utils.set_random_seed(RANDOM_SEED)` + `tf.config.experimental.enable_op_determinism()`, immediately before model construction) for anyone who wants to apply it to a specific other script.
+### The sequence-modeling pair (IMP-02, IMP-06) needed a real correction, not just a note
+
+This is the one place the fix changed something that matters. Under the old unseeded runs, window=5 gave 0.4161/1.0000/0.1458 and window=15 gave 0.2766/~1.0000/0.2718 -- a large, clean-looking gap that IMP-06's original writeup read as "FPR nearly tripled... going from window=5 to window=15," used to decisively rule out "not enough context" as the sequence-modeling problem.
+
+With the fix applied and both re-run, **window=5 now gives 0.2766/1.0000/0.2719 and window=15 gives 0.2766/1.0000/0.2718 -- the same result, to within 0.0001 FPR.** Both window sizes converge to the identical poor local optimum under seed=42. That is direct, hard evidence that **the original 5-vs-15 comparison was not a controlled measurement of window-size effect -- it was comparing two different unseeded runs, each of which happened to land on a different local optimum, and the "window size" variable wasn't actually isolated.** The LSTM experiments were always more exposed to this than the dense-autoencoder ones: more parameters, a non-convex recurrent loss landscape with more local optima for an unseeded initialization to land in.
+
+**What this does and doesn't change about the project's conclusions:** it does not rescue sequence modeling as a working improvement -- both properly-controlled runs still land at FPR ≈0.27, far worse than the static baseline's 0.104, so "LSTM sequence modeling at this architecture scale doesn't help" still stands. What it *does* retract is the specific comparative claim that *more context measurably makes it worse* -- that comparison wasn't actually isolating window size, and shouldn't have been presented as if it was. A properly controlled test of window-size effect would need multiple seeds per window size (to characterize the *distribution* of outcomes each architecture lands in, not a single point estimate) -- out of scope for this project's remaining timeline, and not necessary given sequence modeling is already closed as a direction for an unrelated, still-valid reason (FPR far worse than baseline at every window size tested). See `Kitsune_Improvement.md`'s IMP-02/IMP-06 rows for the cross-referenced correction note.
+
+The other 3 training scripts in this project (`kitsune_isolation_forest.py`, `kitsune_supervised_hybrid.py`, `kitsune_real_kitnet.py`) didn't need this fix -- see above.
 
 ---
 

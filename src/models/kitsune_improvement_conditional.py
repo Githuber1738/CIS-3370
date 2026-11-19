@@ -29,6 +29,7 @@ from src.ingestion.kitsune import load_kitsune
 from src.models.kitsune_autoencoder import MODEL_DIR, evaluate
 
 SPLIT_INDEX = 1_000_000
+RANDOM_SEED = 42
 CONTEXT_WINDOW = 50
 
 
@@ -96,6 +97,9 @@ def main():
 
     print("Building and training conditional autoencoder...")
     t_train_start = time.time()
+    import tensorflow as _tf
+    keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     model = build_conditional_autoencoder(X_train_s.shape[1], context_train.shape[1])
     history = model.fit(X_train_cond, X_train_s, epochs=10, batch_size=5000, verbose=2)
     train_time = time.time() - t_train_start

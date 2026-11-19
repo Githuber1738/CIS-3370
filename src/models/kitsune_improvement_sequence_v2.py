@@ -19,6 +19,7 @@ from src.models.kitsune_autoencoder import MODEL_DIR, evaluate
 from src.models.kitsune_improvement_sequence import build_lstm_autoencoder
 
 SPLIT_INDEX = 1_000_000
+RANDOM_SEED = 42
 WINDOW = 15
 TRAIN_STRIDE = 5
 LSTM_UNITS = 32
@@ -57,6 +58,10 @@ def main():
 
     print("Building and training LSTM autoencoder...")
     t_train_start = time.time()
+    import tensorflow as _tf
+    from tensorflow import keras as _keras
+    _keras.utils.set_random_seed(RANDOM_SEED)  # reproducibility fix: see docs/TASKS.md 2026-11-19
+    _tf.config.experimental.enable_op_determinism()  # seed alone wasn't bit-exact (CPU float-reduction order); see Kitsune_Replication.md
     model = build_lstm_autoencoder(WINDOW, n_features, units=LSTM_UNITS)
     history = model.fit(train_windows, train_windows, epochs=10, batch_size=2000, verbose=2)
     train_time = time.time() - t_train_start
