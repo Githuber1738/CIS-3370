@@ -1,43 +1,34 @@
 # Task Delegation Log
 
-## Scope decision (2026-09-15, revised same day)
+## Scope decision — CURRENT (updated 2026-11-19)
 
-Originally started with NSL-KDD only. **Revised per professor's guidance:**
-NSL-KDD is the dataset already covered in class, so the professor wants the
-team to work a different, more challenging dataset instead. Primary target is
-now **CIC-DoS2017**. NSL-KDD ingestion code already written stays in the repo
-(useful reference / possible comparison baseline) but is no longer the
-critical path. Kitsune remains an open stretch goal, undecided.
+**Kitsune-only, final.** The scope moved NSL-KDD-only (2026-09-15) → CIC-DoS2017/ODDS
+(2026-09-15, same day, per professor's guidance) → **Kitsune-only** (2026-10-08,
+team-agreed, final). It has not changed since. NSL-KDD and CIC-DoS2017 ingestion
+code stays in the repo as reference only — neither is part of the active
+reproduction. See the Status Log below for the full dated history; see
+`Kitsune_Replication.md` and `Kitsune_Improvement.md` for all technical results.
 
 ## Roles
 
 ### Student 1 — Data & System Architect
-Owns dataset acquisition, directory layout, and environment setup.
-
-Immediate tasks:
-- [x] Run `scripts/download_nsl_kdd.sh` and confirm all four files land in `data/nsl_kdd/`
-- [ ] Confirm `python -m venv .venv && pip install -r requirements.txt` works clean on a teammate's machine
-
-Stretch goals (defer until NSL-KDD reproduction is working):
-- [ ] Decide which Kitsune attack scenario to target (see `scripts/download_kitsune.sh` header — check the xNIDS repo at github.com/CactiLab/code-xNIDS for which one they used) and run the download
-- [ ] Get a Kaggle API token and run `scripts/download_cic_dos2017.sh`, or email UNB CIC for direct access if the mirror is unsuitable
+Dataset acquisition and environment setup for Kitsune are done
+(`data/kitsune/os_scan/`, `scripts/download_kitsune.sh`). Remaining:
+- [ ] Confirm `python -m venv .venv && pip install -r requirements.txt` works clean on a teammate's machine who hasn't touched this repo yet.
 
 ### Student 2 — Backend / Logic Developer
-Owns ingestion, preprocessing, and baseline model/query code.
-
-Immediate tasks:
-- [ ] Write `src/ingestion/` loaders for each dataset (NSL-KDD is plain-text CSV-like with a 42-column schema + an undocumented `difficulty` 43rd column — watch for that)
-- [ ] Write `src/preprocessing/` for encoding, scaling, class-imbalance handling
-- [ ] Stand up a baseline model per target dataset once data is in place
+Ingestion, the baseline detector, the explanation method, and the full
+replication + improvement experiment suites are done — see `src/ingestion/`,
+`src/models/`, `src/explain/`, and both `Kitsune_*.md` documents. Remaining,
+if there's appetite before the deadline (optional, not blocking):
+- [ ] One more improvement experiment: an adaptive/local anomaly threshold (see "Beyond Standard Tuning" in `Kitsune_Improvement.md`) — the one brainstormed idea not yet tested.
 
 ### Student 3 — Documentation & Project Manager / Analyst
-Owns `README.md`, task tracking, dependency management, and course alignment.
-
-Immediate tasks:
-- [ ] Keep this file current as tasks move
-- [ ] Keep `requirements.txt` in sync with what's actually imported
-- [ ] Cross-check deliverables against the course's capstone rubric (paper selection/proposal, reproduction, final presentation, GitHub repo + project board, Wiki report)
-- [ ] Track the team's chosen commit approach (Individual vs. Delegated Commits) — this needs to be declared in the proposal per the course's GitHub requirements
+Immediate tasks (these are the open items that actually matter for the grade right now):
+- [ ] **Add `cyberknowledge` as a repo collaborator** — flagged repeatedly since October, still open, two-minute fix.
+- [ ] **Correct the GitHub Wiki.** As of 2026-11-17 it describes the project as "reproducing Kitsune" with no mention of xNIDS, and says results are "Pending" — neither is accurate. It needs to reflect: the target is xNIDS (Kitsune is one target detector within it), the replication phase is closed with a well-documented finding, and the improvement phase is actively producing results. `Kitsune_Replication.md` and `Kitsune_Improvement.md` have everything needed to write this correctly.
+- [ ] Confirm the GitHub Project board reflects current status (it was substantially updated through 2026-11-17; verify it's still accurate).
+- [ ] Prepare materials for the Dec 1/3 final presentations.
 
 ## Status Log
 
