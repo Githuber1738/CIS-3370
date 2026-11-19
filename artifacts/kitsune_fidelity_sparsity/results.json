@@ -1,0 +1,28 @@
+{
+  "n_anomaly": 20,
+  "n_benign_in_window": 15,
+  "n_benign_out_window": 15,
+  "ada_curve_pct": [
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0
+  ],
+  "ada_auc": 1.0,
+  "benign_anomalous_rate_in_window_k10": 1.0,
+  "benign_anomalous_rate_out_window_k10": 1.0,
+  "maz_auc": 0.8166249153184167,
+  "maz_halfnorm_scale": 0.2296005181034,
+  "paper_reference": {
+    "ada_auc_kitsune_xnids": 0.316,
+    "maz_auc_kitsune_xnids": 0.774,
+    "table4_replacement_kitsune": 0.239
+  }
+}
