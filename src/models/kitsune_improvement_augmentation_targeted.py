@@ -17,7 +17,6 @@ reported for comparability with every other experiment.
 """
 
 import time
-from pathlib import Path
 
 import numpy as np
 from sklearn.model_selection import train_test_split as sk_split

@@ -16,7 +16,7 @@ from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from tensorflow import keras
 
 from src.ingestion.kitsune import load_kitsune
-from src.models.kitsune_autoencoder import build_autoencoder, evaluate, MODEL_DIR
+from src.models.kitsune_autoencoder import build_autoencoder, evaluate
 
 SPLIT_INDEX = 1_000_000
 RANDOM_SEED = 42

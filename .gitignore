@@ -32,3 +32,8 @@ kaggle.json
 # os
 .DS_Store
 Thumbs.db
+
+# Office lock files (created while a doc is open in PowerPoint/Word/Excel)
+~$*.pptx
+~$*.docx
+~$*.xlsx

@@ -40,3 +40,9 @@ fi
 kaggle datasets download -d dhoogla/cicdos2017 -p "$DEST" --unzip
 echo "Done. Files in $DEST:"
 ls -lh "$DEST"
+
+if [[ ! -f "$DEST/cicdos2017.parquet" ]]; then
+  echo "WARNING: config.yaml expects data/cic_dos2017/cicdos2017.parquet, but no file" >&2
+  echo "by that name was found above. The Kaggle mirror's internal filename may have" >&2
+  echo "changed -- rename the downloaded file to match, or update config.yaml." >&2
+fi

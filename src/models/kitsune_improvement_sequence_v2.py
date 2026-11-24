@@ -86,7 +86,10 @@ def main():
     for k, v in metrics.items():
         print(f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}")
     print(f"\ntotal_runtime: {total_time:.1f}s | training_time: {train_time:.1f}s | final_loss: {final_loss:.6f}")
-    print("\nRound 1 window=5 result: Precision 0.4161 / Recall 1.0000 / FPR 0.1458")
+    print("\nRound 1 window=5 result (historical, unseeded): Precision 0.4161 / Recall 1.0000 / FPR 0.1458")
+    print("Window=5 re-run with the determinism fix: Precision 0.2766 / Recall 1.0000 / FPR 0.2719")
+    print("  (the window=5 vs window=15 comparison above was not controlled for seeding -- see")
+    print("   Kitsune_Replication.md's 'Reproducibility Fix' section for the full correction)")
     print("Baseline (per-row): Precision 0.500 / Recall 1.000 / FPR 0.104")
     print("xNIDS paper's reported Kitsune row (Table 12): Precision 0.9568 / Recall 0.9972 / FPR 0.001")
 

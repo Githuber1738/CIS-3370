@@ -2,6 +2,7 @@
 and report per-channel-group feature importance for each.
 """
 
+import ast
 from pathlib import Path
 
 import pandas as pd
@@ -21,7 +22,7 @@ def load_selection_summary():
             if not line or line.startswith("threshold"):
                 continue
             name, info = line.split(": ", 1)
-            summary[name] = eval(info)
+            summary[name] = ast.literal_eval(info)
     return summary
 
 

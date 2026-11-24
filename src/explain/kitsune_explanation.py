@@ -132,7 +132,7 @@ class KitsuneExplanation:
             lambda1=params.get("lambda1"), alpha=params.get("alpha"),
             lasso_weights=params.get("lasso_weights"), gl_weights=params.get("gl_weights"),
         )
-        train_idx, test_idx = asgl.train_test_split(nrows=x.shape[0], train_pct=0.7, random_state=1)
+        train_idx, _ = asgl.train_test_split(nrows=x.shape[0], train_pct=0.7, random_state=1)
         asgl_model.fit(x=x[train_idx, :], y=y[train_idx], group_index=group_index)
         coef_with_intercept = np.array(asgl_model.coef_[0])
         # asgl's sgl() solver (checked against the pinned 1.0.6 source)

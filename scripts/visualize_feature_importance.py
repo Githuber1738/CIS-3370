@@ -12,9 +12,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.explain.kitsune_explanation import KITSUNE_GROUP_NAMES, KITSUNE_GROUP_SIZES
+from src.explain.kitsune_explanation import KITSUNE_GROUP_NAMES, KITSUNE_GROUP_SIZES, KitsuneExplanation
 from src.explain.run_explanation import SAMPLES_DIR, MODEL_PATH, load_selection_summary
-from src.explain.kitsune_explanation import KitsuneExplanation
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

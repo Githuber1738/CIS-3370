@@ -15,10 +15,11 @@ CIS 3370 (Intrusion Detection Systems) capstone project, University of the Incar
 | Replication phase (match the paper's exact numbers) | ✅ **Closed** — exhaustively investigated, documented divergence | [`Kitsune_Replication.md`](Kitsune_Replication.md) |
 | Improvement phase (close the gap via new approaches) | ✅ **Closed** — 16 experiments, diminishing returns confirmed | [`Kitsune_Improvement.md`](Kitsune_Improvement.md) |
 | Explanation fidelity/sparsity (ADA/MAZ, US-07) | ✅ **Closed** | [`Kitsune_Explanation_Fidelity.md`](Kitsune_Explanation_Fidelity.md) |
-| Presentation visuals (timeline, live demo, PCA overlap, comparison chart) | ✅ Built and verified | `scripts/visualize_*.py`, `scripts/live_inference_demo.py` |
-| GitHub Wiki reproduction report | 🔶 In progress (team) — now the main open item | repo Wiki tab |
+| Presentation visuals (timeline, live demo, PCA overlap, comparison chart, per-feature importance) | ✅ Built and verified | `scripts/visualize_*.py`, `scripts/live_inference_demo.py` |
+| Final presentation deck | ✅ Built (rough draft, verified) | [`Project_Aegis_Final.pptx`](Project_Aegis_Final.pptx) |
+| GitHub Wiki reproduction report | 🔶 In progress (team) — now the only open item | repo Wiki tab |
 
-**The short version of the finding:** our detector reproduces the paper's architecture and training setup faithfully, but lands at Precision ≈0.50 / Recall ≈1.00 / FPR ≈0.10 against the paper's claimed 0.9568 / 0.9972 / 0.001. Sixteen independent experiments (different architectures, algorithms, training regimes, feature transformations, context conditioning, adaptive thresholding, and a direct test of the paper's own evaluation protocol), plus two root-cause diagnostics ruling out a labeling artifact, all converge on the same cause: benign traffic *during* the attack window statistically resembles the attack itself, and the standard chronological train/test split means no model ever sees that condition during training. **The experimental phase is now locked** — full reasoning, evidence, and every experiment's results are in `Kitsune_Replication.md` and `Kitsune_Improvement.md`; read those before re-deriving any of this from scratch. Remaining work is the Wiki report and Dec 1/3 presentation prep (see `docs/TASKS.md`).
+**The short version of the finding:** our detector reproduces the paper's architecture and training setup faithfully, but lands at Precision ≈0.50 / Recall ≈1.00 / FPR ≈0.10 against the paper's claimed 0.9568 / 0.9972 / 0.001. Sixteen independent experiments (different architectures, algorithms, training regimes, feature transformations, context conditioning, adaptive thresholding, and a direct test of the paper's own evaluation protocol), plus two root-cause diagnostics ruling out a labeling artifact, all converge on the same cause: benign traffic *during* the attack window statistically resembles the attack itself, and the standard chronological train/test split means no model ever sees that condition during training. **The experimental phase is now locked** — full reasoning, evidence, and every experiment's results are in `Kitsune_Replication.md` and `Kitsune_Improvement.md`; read those before re-deriving any of this from scratch. Remaining work is the Wiki report (see `docs/TASKS.md`).
 
 ## Project layout
 
@@ -28,6 +29,7 @@ IDS_Aegis/
 ├── Kitsune_Replication.md      # closed: why we can't match the paper's numbers, in full
 ├── Kitsune_Improvement.md      # closed: 16 experiments attempting to close the gap anyway
 ├── Kitsune_Explanation_Fidelity.md  # closed: ADA/MAZ explanation fidelity + sparsity (US-07)
+├── Project_Aegis_Final.pptx     # final presentation deck (rough draft, verified)
 ├── requirements.txt
 ├── .gitignore
 ├── config/
