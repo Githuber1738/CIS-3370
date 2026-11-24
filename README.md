@@ -44,7 +44,7 @@ IDS_Aegis/
 │   ├── download_nsl_kdd.sh       # reference
 │   ├── download_cic_dos2017.sh   # reference
 │   ├── download_all.sh
-│   ├── visualize_timeline.py, visualize_latent_overlap.py, visualize_comparison.py  # presentation visuals
+│   ├── visualize_timeline.py, visualize_latent_overlap.py, visualize_comparison.py, visualize_feature_importance.py  # presentation visuals
 │   ├── live_inference_demo.py    # live demo: streams real inference with running metrics
 │   └── diagnostic_label_structure.py
 ├── src/
@@ -96,6 +96,7 @@ python -m scripts.live_inference_demo        # live streamed inference with runn
 python -m scripts.visualize_comparison       # grouped bar chart from Kitsune_Improvement.md's verified numbers
 python -m src.models.kitsune_ensemble        # run this first if it hasn't been --
 python -m scripts.visualize_latent_overlap   # -- needed to regenerate artifacts/kitsune_*_group_rmse.npy (gitignored, large)
+python -m scripts.visualize_feature_importance  # per-feature importance, TP vs. FP (T-06.3)
 ```
 
 ## Team roles & project history

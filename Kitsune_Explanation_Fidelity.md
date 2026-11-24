@@ -43,8 +43,34 @@ Both saturated results are mechanistically explainable, confirmed by inspecting 
 - **T-07.4** (baseline-explainer comparison, e.g. SHAP): **explicitly deferred, not attempted.** Implementing a model-agnostic baseline explainer (SHAP/LIME/etc.) and running it against our reconstruction-error-based detector is a separate, non-trivial build — and given our own detector already diverges from the paper's, a baseline-explainer comparison would mainly tell us how explanation methods differ on a non-representative detector, which is of secondary value against the Dec 1/3 deadline. Recommend closing this subtask as explicitly out of scope rather than leaving it open indefinitely.
 - **T-07.5** (document divergence from the paper's Table 3/5 Kitsune columns): done, in the table above.
 
+## Per-feature importance visualization (T-06.3)
+
+`group_importance()` reports the mean \|coefficient\| per channel — useful for a
+one-line summary ("IP dominates"), but it dilutes signal that's concentrated in
+a few individual features within a large group. `scripts/visualize_feature_importance.py`
+re-runs the exact same explanation pipeline (`KitsuneExplanation`, same seed=42
+weighted sampling) on the same TP/FP samples, but keeps the raw per-feature
+coefficients and plots the top 15 by \|coefficient\| for each, colored by channel.
+
+**Finding**: at the individual-feature level, the single largest bars for both
+the TP and the FP sample are two **IPtoIP** features (`feature_58`, `feature_77`),
+not MAC-IP or IP. This doesn't contradict the group-level finding — IPtoIP is
+the largest channel (35 of 115 features), so a couple of strongly-weighted
+features inside it can dominate the per-feature ranking while still averaging
+out to a lower *mean* than IP's more uniformly-weighted 15 features. The two
+summaries answer different questions (which single features matter most vs.
+which channel matters most on average) and both are legitimate; this is a
+clarification, not a correction of the 2026-11-19 IP-dominance finding above.
+The TP and FP samples' top-15 lists are nearly identical (same top 2 features,
+heavy overlap throughout) — further direct evidence, at this finer grain, that
+the FP is a genuine near-miss in feature space rather than a random error.
+
+Saved to `artifacts/kitsune_feature_importance/feature_importance.png`.
+
 ## Files
 
 - `src/explain/fidelity_sparsity.py` — the full computation (stratified sampling, ADA curve, benign anomalous-rate check, MAZ curve), no retraining.
 - `artifacts/kitsune_fidelity_sparsity/results.json`, `ada_curve.csv`, `maz_curve.csv` — saved outputs.
 - `src/explain/kitsune_explanation.py` — the intercept-alignment bug fix.
+- `scripts/visualize_feature_importance.py` — T-06.3's per-feature importance chart.
+- `artifacts/kitsune_feature_importance/feature_importance.png` — saved output.
